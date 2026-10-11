@@ -1,1 +1,45 @@
-.github/workflows/zaznam.yml
+name: Záznam provozu PID
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zaznam
+  cancel-in-progress: false
+
+jobs:
+  zaznam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Načíst dosavadní záznam
+        run: |
+          mkdir -p out
+          if git ls-remote --exit-code origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data
+            git archive FETCH_HEAD | tar -x -C out
+          fi
+
+      - name: Stáhnout polohy a zapsat VJŘ
+        env:
+          GOLEMIO_KEY: ${{ secrets.GOLEMIO_KEY }}
+        run: python3 zaznam.py out
+
+      - name: Uložit do větve data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b data
+          git config user.name "zaznam-pid"
+          git config user.email "zaznam-pid@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Záznam $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
