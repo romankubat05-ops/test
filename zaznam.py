@@ -81,6 +81,8 @@ def main():
     seen = 0
     for f in feats:
         p = f.get("properties") or {}
+        c = (f.get("geometry") or {}).get("coordinates") or []
+        pos = [round(float(c[1]), 5), round(float(c[0]), 5)] if len(c) >= 2 else None
         line = find(p, "route_short_name", "gtfs_route_short_name")
         run = find(p, "sequence_id", "run_number", "internal_run_number")
         route = find(p, "origin_route_name", "internal_route_name") or line
@@ -101,10 +103,12 @@ def main():
         trips = log["runs"].setdefault(k, {"trips": []})["trips"]
         last = trips[-1] if trips else None
         if not last or last["tid"] != tid or now_ms - last["t1"] > NEW_TRIP_GAP_MS:
-            trips.append({**rec, "t0": now_ms, "t1": now_ms, "d0": d, "d1": d})
+            trips.append({**rec, "t0": now_ms, "t1": now_ms, "d0": d, "d1": d, "p0": pos, "p1": pos})
         else:
             last["t1"] = now_ms
             last["d1"] = d
+            if pos:
+                last["p1"] = pos
             if rec["evc"] is not None:
                 last["evc"] = rec["evc"]
         seen += 1
